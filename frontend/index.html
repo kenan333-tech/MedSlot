@@ -49,6 +49,7 @@
   .brand-name { font: 800 22px/1 var(--display); letter-spacing: -0.02em; }
   .brand-sub { font-size: 13px; color: var(--ink-soft); }
   .mode { font-size: 13px; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .mode[hidden] { display: none; }
   .mode input { accent-color: var(--scrub); width: 16px; height: 16px; }
 
   /* ---------- Layout ---------- */
@@ -289,7 +290,7 @@
       <div class="brand-sub">Klinikaya onlayn növbə</div>
     </div>
   </div>
-  <label class="mode" title="n8n workflow-u aktiv deyilsə işarələ">
+  <label class="mode" id="devMode" hidden title="n8n workflow-u aktiv deyilsə işarələ">
     <input id="testMode" type="checkbox" /> n8n test rejimi
   </label>
 </header>
@@ -436,6 +437,9 @@ const MONTHS = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avq", "sen", "
 const WEEKDAYS = ["Bazar", "B.e.", "Ç.a.", "Çər.", "C.a.", "Cümə", "Şənbə"];
 
 // ================= API =================
+// Developer üçün: ünvanın sonuna ?test yazanda "n8n test rejimi" qutusu görünür
+if (new URLSearchParams(location.search).has("test")) $("devMode").hidden = false;
+
 function baseUrl() {
   return `${N8N}/${$("testMode").checked ? "webhook-test" : "webhook"}/${PREFIX}`;
 }

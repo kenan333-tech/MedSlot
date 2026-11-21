@@ -1,15 +1,16 @@
-# n8n workflow-ları: node-node qurulma bələdçisi
+# n8n workflow-ları
 
-3 workflow quracaqsan. Hər birini qurduqdan sonra **Postman ilə yoxla**, sonra **Active** et və
-`⋯ → Download` ilə JSON-u bu qovluğa (`n8n/`) yadda saxla. Təhvildə bu JSON-lar olmalıdır.
+Bu sənəd hər workflow-un hansı node-lardan ibarət olduğunu və necə işlədiyini izah edir.
+Hazır workflow-lar bu qovluqdadır, onları **⋯ → Import from File** ilə import etmək kifayətdir.
+Aşağıdakı addımlar workflow-u sıfırdan qurmaq və ya dəyişmək istəyənlər üçündür.
 
-| Fayl adı (export) | Workflow | Trigger |
+| Fayl | Workflow | Trigger |
 |---|---|---|
 | `W1_novbe_api.json` | Növbə API | Webhook (4 endpoint) |
 | `W2_ai_yonlendirme.json` | AI yönləndirmə | Webhook `POST /medslot/triage` |
 | `W3_xatirlatma.json` | Xatırlatma | Schedule, hər 15 dəq |
 
-SQL sorğuları hazırdır: `n8n/sql/` qovluğundan kopyala-yapışdır.
+Workflow-lardakı SQL sorğuları ayrıca `n8n/sql/` qovluğunda saxlanılır.
 
 ---
 
@@ -91,6 +92,10 @@ Respond body: `{{ { doctors: $json.doctors } }}`
 > `booked` edilir. Bu, bir SQL əmrində baş verir — ikinci sorğu 0 sətir dəyişir. Üstəlik
 > `models.py`-dakı unikal indeks bazanın özündə ikinci aktiv yazılışı qadağan edir.
 
+**Əlavə: təsdiq mesajı.** `Cavab book` node-undan sonra `Təsdiq mesajı` (Telegram) gəlir.
+Cavab əvvəlcə frontend-ə gedir, mesaj ondan sonra göndərilir, ona görə pasiyent gözləmir.
+Telegram xəta versə belə (`On Error → Continue`), növbə yenə də qeydə alınır.
+
 ### 4) POST /medslot/cancel
 ```
 [Webhook POST medslot/cancel] → [Postgres: 04_cancel.sql] → [IF: freed boş deyil?]
@@ -101,6 +106,8 @@ Respond body: `{{ { doctors: $json.doctors } }}`
 - IF (Boolean → is true): `{{ !!$json.freed }}`
 - Respond 200: `{{ { ok: true, freed: $json.freed } }}`
 - Respond 404: `{{ { error: "Aktiv növbə tapılmadı (artıq ləğv olunub?)" } }}`
+
+**Əlavə:** `Cavab cancel`-dən sonra `Ləğv mesajı` (Telegram) gəlir.
 
 ---
 
@@ -146,6 +153,7 @@ Respond 400: `{{ { error: "Şikayətinizi bir az ətraflı yazın" } }}`
 ```
 > Webhook node-unun adı fərqlidirsə, `$('Webhook')` hissəsini öz adına dəyiş.
 
+- **Options → Add option → Response → Response Format: `JSON`**. Bunu etməsən, n8n kodlaşdırmanı səhv təxmin edir və ə, ı, ü hərfləri Çin simvollarına çevrilir.
 - **Settings** sekmesi: `Retry On Fail` ✓ (2 dəfə, 2000 ms) və
   `On Error` → **Continue** — Groq xəta versə də workflow dayanmasın, Code node fallback edəcək.
 
@@ -222,9 +230,8 @@ return [{
 
 ---
 
-## Yoxlama siyahısı (hər workflow-dan sonra)
+## Yoxlama
 
-- [ ] Test rejimində `/webhook-test/...` ünvanı ilə Postman-dan sorğu → düzgün JSON
-- [ ] Səhv sorğu (boş body) → 400
-- [ ] Workflow **Active** → `/webhook/...` (test-siz) ünvanı işləyir
-- [ ] `⋯ → Download` → JSON `n8n/` qovluğuna
+- Test rejimində `/webhook-test/...` ünvanı ilə Postman-dan sorğu göndər: düzgün JSON qayıtmalıdır.
+- Səhv sorğu (boş body) 400 qaytarmalıdır.
+- Workflow aktiv olanda `/webhook/...` (test-siz) ünvanı işləməlidir.

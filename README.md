@@ -1,14 +1,37 @@
-# MedSlot — klinika üçün onlayn növbə sistemi
+# MedSlot
 
-> Pasiyent şikayətini yazır → **Groq AI** uyğun ixtisası təklif edir → boş saat seçilir →
-> eyni saata ikinci yazılış **mümkün deyil** → qəbuldan 2 saat əvvəl **Telegram** xatırlatması gəlir.
+Klinikalar üçün onlayn növbə sistemi. Pasiyent şikayətini öz sözləri ilə yazır, AI uyğun ixtisası təklif edir, pasiyent boş saatı seçib növbə götürür. Təsdiq, ləğv və qəbuldan əvvəlki xatırlatma Telegram ilə gəlir.
 
-**Problem:** Klinikada növbələr telefonla yazılır. Eyni saata iki pasiyent düşür, bəziləri növbəni unudur və gəlmir.
+## Hansı problemi həll edir
 
-**Alətlər (1-ci ay):** Docker · n8n (Webhook, Postgres, HTTP Request, IF, Code, Schedule, Telegram) ·
-PostgreSQL · Python (SQLAlchemy, psycopg2, requests) · Groq API · Postman · HTML + Tailwind (AI ilə)
+Bir çox klinikada növbələr hələ də telefonla yazılır. Bunun nəticəsində:
 
----
+- eyni saata iki pasiyent yazılır;
+- pasiyent hansı həkimə getməli olduğunu bilmir;
+- növbəni unudan pasiyent gəlmir və saat boş qalır.
+
+MedSlot bu üç problemi aradan qaldırır.
+
+## İmkanlar
+
+- **AI yönləndirmə.** Groq API şikayəti oxuyur və klinikadakı ixtisaslardan birini təklif edir. Şikayətdə təcili hal əlaməti varsa, pasiyent 103-ə zəng etməyə yönləndirilir.
+- **Eyni saata iki yazılış mümkün deyil.** Slot atomik `UPDATE ... WHERE status = 'free'` ilə tutulur. Bazadakı qismən unikal indeks ikinci aktiv yazılışın qarşısını ayrıca alır.
+- **Avtomatik slotlar.** Python skripti hər həkimin iş saatlarından növbəti 7 gün üçün 30 dəqiqəlik saatlar yaradır. Mövcud saatlar təkrar yaradılmır.
+- **Telegram bildirişləri.** Növbə təsdiqlənəndə və ləğv olunanda mesaj gəlir. Qəbula 2 saat qalmış isə bir dəfə xatırlatma göndərilir.
+- **Növbə talonu.** Pasiyent seçim etdikcə talon dolur. Təsdiqdən sonra talonu çap etmək olur.
+- **Doluluq hesabatı.** Hər həkim üzrə slot sayı, dolu saatlar və ləğv edilmiş növbələr.
+
+## Texnologiyalar
+
+| Hissə | Texnologiya |
+|---|---|
+| Backend və avtomatlaşdırma | n8n (Webhook, Postgres, HTTP Request, IF, Code, Schedule, Telegram) |
+| Verilənlər bazası | PostgreSQL 17 |
+| Skriptlər | Python 3.11+, SQLAlchemy, psycopg2, requests |
+| AI | Groq API (`openai/gpt-oss-120b`) |
+| Frontend | HTML, CSS, JavaScript |
+| Mühit | Docker Compose |
+| API testləri | Postman |
 
 ## Arxitektura
 
@@ -16,241 +39,132 @@ PostgreSQL · Python (SQLAlchemy, psycopg2, requests) · Groq API · Postman · 
  Frontend (index.html)
      │  HTTP / JSON
      ▼
- n8n ──────────────► Groq API  (şikayət → ixtisas JSON)
-  W1 Növbə API         
-  W2 AI yönləndirmə    
-  W3 Xatırlatma ─────► Telegram (pasiyent = sən)
+ n8n ──────────────► Groq API   (şikayət → ixtisas)
+  W1 Növbə API ─────► Telegram  (təsdiq / ləğv)
+  W2 AI yönləndirmə
+  W3 Xatırlatma ────► Telegram  (qəbuldan 2 saat əvvəl)
      │  SQL
      ▼
- PostgreSQL (4 cədvəl) ◄──── Python: models.py, seed.py,
-                                     slot_generator.py (SQLAlchemy),
-                                     report.py (psycopg2)
+ PostgreSQL ◄──── Python: seed.py, slot_generator.py, report.py
 ```
-n8n və Python bir-birini birbaşa çağırmır: Python slotları **bazaya yazır**, n8n onları **bazadan oxuyur**.
+
+n8n və Python skriptləri bir-birini birbaşa çağırmır. Python slotları bazaya yazır, n8n onları bazadan oxuyur.
 
 ## Verilənlər bazası
 
 | Cədvəl | Sütunlar | Qeyd |
 |---|---|---|
-| `doctors` | id · full_name · specialty · work_start · work_end | seed.py doldurur |
-| `slots` | id · doctor_id · start_at · status | `free` / `booked`, (doctor_id, start_at) unikal |
-| `patients` | id · full_name · phone · chat_id | phone unikal |
-| `appointments` | id · slot_id · patient_id · complaint · status · reminded | `booked` / `cancelled`; bir slota 1 aktiv yazılış |
+| `doctors` | id, full_name, specialty, work_start, work_end | |
+| `slots` | id, doctor_id, start_at, status | `free` / `booked`; `(doctor_id, start_at)` unikaldır |
+| `patients` | id, full_name, phone, chat_id | telefon unikaldır |
+| `appointments` | id, slot_id, patient_id, complaint, status, reminded, created_at | `booked` / `cancelled`; bir slotda yalnız bir aktiv yazılış |
 
-## API (n8n webhook-ları)
+## API
 
 Baza ünvan: `http://localhost:5678/webhook/medslot`
 
-| Metod | Yol | Body / parametrlər | Cavab |
+| Metod | Yol | Sorğu | Cavab |
 |---|---|---|---|
-| GET | `/doctors` | — | `{doctors: [...]}` |
-| GET | `/slots` | `?doctor_id=1&date=2026-11-23` | `{slots: [{id, date, time}]}` · 400 |
-| POST | `/triage` | `{complaint}` | `{specialty, reason, urgent, doctors}` · 400 |
-| POST | `/book` | `{slot_id, full_name, phone, complaint}` | `{appointment}` · 400 · **409** |
-| POST | `/cancel` | `{appointment_id}` | `{ok, freed}` · 404 |
+| GET | `/doctors` | | `{ doctors: [...] }` |
+| GET | `/slots` | `?doctor_id=1&date=2026-11-23` | `{ slots: [{ id, date, time }] }`, 400 |
+| POST | `/triage` | `{ complaint }` | `{ specialty, reason, urgent, doctors }`, 400 |
+| POST | `/book` | `{ slot_id, full_name, phone, complaint }` | `{ appointment }`, 400, **409** (saat tutulub) |
+| POST | `/cancel` | `{ appointment_id }` | `{ ok, freed }`, 404 |
 
-## Qovluq
+Bütün sorğular `postman/MedSlot.postman_collection.json` kolleksiyasındadır.
 
-```
-medslot/
-├─ docker-compose.yml        n8n + PostgreSQL
-├─ .env.example              açarların nümunəsi
-├─ python/
-│  ├─ db.py                  bağlantı
-│  ├─ models.py              4 cədvəl (SQLAlchemy)
-│  ├─ seed.py                cədvəllər + 6 həkim
-│  ├─ slot_generator.py      7 günlük 30 dəq. slotlar (SQLAlchemy, while + sleep)
-│  ├─ report.py              doluluq faizi (psycopg2)
-│  └─ demo_double_book.py    "iki yazılış olmur" demosu
-├─ n8n/
-│  ├─ WORKFLOWS.md           node-node qurulma bələdçisi
-│  ├─ sql/                   hazır SQL sorğuları
-│  └─ W1/W2/W3 *.json        ← sən export edəcəksən
-├─ postman/MedSlot.postman_collection.json
-├─ frontend/index.html
-└─ docs/screenshots/         ← ekran şəkilləri
-```
+## Quraşdırma
 
----
+**Tələblər:** Docker Desktop, Python 3.11+, [Groq API açarı](https://console.groq.com), [@BotFather](https://t.me/BotFather)-dan Telegram bot token-i.
 
-# Addım-addım: sıfırdan təhvilə qədər
-
-Hər addımın sonunda **✅ Yoxla** var. Yoxlama keçmədən növbəti addıma keçmə.
-
-## Addım 0 · Hazırlıq (≈30 dəq)
-
-1. Quraşdırılmalıdır: **Docker Desktop**, **Python 3.11+**, **Postman**, (istəyə görə) **DataGrip**.
-2. **Groq açarı:** `console.groq.com` → qeydiyyat → **API Keys → Create** → `gsk_...` açarını saxla.
-3. **Telegram bot:** Telegram-da `@BotFather` → `/newbot` → ad ver → **token** al.
-4. Yeni bota özün `/start` yaz. Sonra brauzerdə aç:
-   `https://api.telegram.org/bot<TOKEN>/getUpdates` → `"chat":{"id": 123456789}` — bu sənin **chat_id**-ndir.
-5. `.env.example` faylını `.env` adı ilə kopyala, dəyərləri yaz.
-
-✅ **Yoxla:** Groq açarı, bot token və chat_id əlindədir.
-
-## Addım 1 · Docker: n8n + PostgreSQL (≈20 dəq) · *Dərs 6*
+**1. Konteynerləri işə sal**
 
 ```bash
-cd medslot
 docker compose up -d
-docker compose ps        # hər ikisi "running" olmalıdır
 ```
-`http://localhost:5678` aç → n8n hesabı yarat (lokaldır).
 
-✅ **Yoxla:** DataGrip-də qoşul: host `localhost`, port `5432`, db `layihe`, user `app`, şifrə `app123`.
+n8n `http://localhost:5678` ünvanında açılır.
 
-## Addım 2 · Python mühiti və cədvəllər (≈30 dəq) · *Dərs 1–5, 8*
+**2. Bazanı və slotları hazırla**
 
 ```bash
 cd python
 python -m venv .venv
-# Windows: .venv\Scripts\activate     Mac/Linux: source .venv/bin/activate
+.venv\Scripts\activate          # Mac/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-python seed.py
+python seed.py                  # cədvəllər və həkimlər
+python slot_generator.py --once # növbəti 7 günün slotları
 ```
 
-✅ **Yoxla:** DataGrip-də 4 cədvəl var, `SELECT * FROM doctors;` → 6 həkim.
+`python slot_generator.py` arqumentsiz işə salınsa, hər saat slotları yeniləyən fon prosesi kimi işləyir.
 
-## Addım 3 · Slot generatoru (≈20 dəq)
+**3. n8n-i qur**
 
-```bash
-python slot_generator.py --once
-python slot_generator.py --once     # ikinci dəfə: "0 yeni slot" — təkrar yaratmır!
-```
+1. Bu adlarla 3 credential yarat:
+   - **MedSlot DB** (Postgres): host `postgres`, port `5432`, database `layihe`, user `app`, password `app123`
+   - **Groq API** (Header Auth): name `Authorization`, value `Bearer <GROQ_API_KEY>`
+   - **MedSlot Bot** (Telegram API): bot token
+2. `n8n/` qovluğundakı 3 workflow-u import et: **⋯ → Import from File**.
+3. W1 və W3-dəki Telegram node-larında chat_id-ni öz chat_id-nlə əvəz et.
+4. Hər workflow-u aktiv et.
 
-✅ **Yoxla:**
-```sql
-SELECT doctor_id, start_at::date, COUNT(*) FROM slots GROUP BY 1,2 ORDER BY 1,2;
-```
-Hər həkim üçün 6 iş günü görünür, bazar günü yoxdur.
+Node-ların ətraflı izahı: [`n8n/WORKFLOWS.md`](n8n/WORKFLOWS.md).
 
-> 💡 Kodu oxu və başa düş: `set` niyə istifadə olunub? (Cavab: mövcud saatları sürətli yoxlamaq üçün.)
-> Təqdimatda bunu soruşa bilərlər.
+**4. Frontend-i aç**
 
-## Addım 4 · n8n credential-ları (≈15 dəq) · *Dərs 7–8*
-
-`n8n/WORKFLOWS.md` → **0. Credential-lar** bölməsi: Postgres (`host = postgres`!), Groq (Header Auth), Telegram.
-
-✅ **Yoxla:** Postgres credential-ında **Test** yaşıldır.
-
-## Addım 5 · W1 Növbə API (≈2–3 saat) · *Dərs 7, 8*
-
-`WORKFLOWS.md` → **W1**. Sıra ilə qur: `doctors` → `slots` → `book` → `cancel`.
-Hər endpoint-dən sonra Postman-da yoxla.
-
-**Postman:** `Import` → `postman/MedSlot.postman_collection.json`.
-Test zamanı kolleksiyanın `base_url` dəyişənini `http://localhost:5678/webhook-test` et.
-
-✅ **Yoxla:**
-- `GET slots` → saatlar siyahısı
-- `POST book` → 200, `POST book` eyni slot_id ilə → **409**
-- `POST cancel` → 200, təkrar → **404**
-- Səhv body → **400**
-
-## Addım 6 · W2 AI yönləndirmə — Groq (≈2 saat) · *Dərs 5, 7*
-
-`WORKFLOWS.md` → **W2**. Ən vacib 3 şey:
-1. URL: `https://api.groq.com/openai/v1/chat/completions`
-2. Model: `openai/gpt-oss-120b`, `response_format: {type: "json_object"}`
-3. Code node: AI səhv cavab versə → **Terapevt** (fallback).
-
-✅ **Yoxla (Postman):**
-- "başım tez-tez ağrıyır" → `Nevroloq`
-- "qollarımda səpgi var" → `Dermatoloq`
-- "sinəmdə ağrı, nəfəs ala bilmirəm" → `urgent: true`
-
-## Addım 7 · W3 Telegram xatırlatma (≈1 saat) · *Dərs 7, 8*
-
-`WORKFLOWS.md` → **W3**.
-
-✅ **Yoxla:**
-1. DataGrip-də test slotu yarat (1 saat sonraya):
-   ```sql
-   INSERT INTO slots (doctor_id, start_at, status) VALUES (1, now() + interval '1 hour', 'free') RETURNING id;
-   ```
-2. Postman ilə həmin `slot_id`-yə `POST book`.
-3. W3-də **Execute Workflow** → Telegram-a mesaj gəlir.
-4. Yenə **Execute** → mesaj **gəlmir** (reminded = true). ✔ "bir dəfə" qaydası.
-
-## Addım 8 · Workflow-ları aktiv et (≈10 dəq)
-
-Hər 3 workflow-da sağ yuxarıda **Active** ✓. İndi `/webhook/...` (test-siz) ünvanı işləyir.
-Postman-da `base_url`-i yenidən `http://localhost:5678/webhook` et və bütün kolleksiyanı işlət (**Run collection**).
-
-## Addım 9 · Frontend (≈1 saat)
-
-`frontend/index.html` hazırdır (AI ilə yaradılıb, layihə qaydasına uyğun). Lokal serverlə aç:
 ```bash
 cd frontend
 python -m http.server 5500
 ```
-Brauzer: `http://localhost:5500`
 
-> Workflow aktiv deyilsə, yuxarıdakı **"n8n test rejimi"** qutusunu işarələ.
-> Dizaynı dəyişmək istəsən, `n8n/WORKFLOWS.md`-dəki API-ni AI-yə ver və dəyişiklik istə.
+Brauzerdə `http://localhost:5500` ünvanını aç.
 
-✅ **Yoxla:** şikayət → AI kartı → həkim → tarix → saat → ad/telefon → təsdiq → ləğv. Hamısı işləyir.
-
-## Addım 10 · Hesabat və iki yazılış demosu (≈20 dəq) · *Dərs 9 (psycopg2)*
+**5. Yoxla**
 
 ```bash
 cd python
-python report.py              # həkimlər üzrə doluluq faizi
-python demo_double_book.py    # 1-ci: 200, 2-ci: 409
+python demo_double_book.py   # eyni saata iki yazılış: 200 və 409
+python report.py             # həkimlər üzrə doluluq hesabatı
 ```
 
-## Addım 11 · Export və sənədləşmə (≈1 saat)
+> Baza şifrəsi (`app` / `app123`) yalnız lokal demo üçündür. Real açarlar kodda deyil, n8n credential-larında və `.env` faylında saxlanılır. Nümunə üçün `.env.example` faylına bax.
 
-- [ ] n8n: hər workflow → `⋯ → Download` → `n8n/W1_novbe_api.json`, `W2_ai_yonlendirme.json`, `W3_xatirlatma.json`
-- [ ] **JSON-larda açar olmadığını yoxla** (credential-lar export-a daxil olmur, amma kodda əl ilə yazılmış token qalmasın)
-- [ ] `docs/screenshots/`: frontend 4 addım, n8n-in 3 workflow-u, Telegram mesajı, DataGrip-də cədvəllər, `report.py` nəticəsi
-- [ ] Bu README-də ekran şəkillərinə link əlavə et
-- [ ] `.env` faylı repoda **YOXDUR**, `.env.example` **VAR**
-- [ ] (İstəyə görə) 2 dəqiqəlik ekran videosu
+## Qovluq quruluşu
 
-## Addım 12 · Təqdimat, 5–7 dəqiqə
+```
+├─ docker-compose.yml           n8n və PostgreSQL
+├─ .env.example                 lazım olan açarların nümunəsi
+├─ python/
+│  ├─ db.py                     bağlantı ayarları
+│  ├─ models.py                 SQLAlchemy modelləri
+│  ├─ seed.py                   cədvəllər və həkimlər
+│  ├─ slot_generator.py         7 günlük slotlar
+│  ├─ report.py                 doluluq hesabatı (psycopg2)
+│  └─ demo_double_book.py       ikiqat yazılış testi
+├─ n8n/
+│  ├─ W1_novbe_api.json         növbə API
+│  ├─ W2_ai_yonlendirme.json    AI yönləndirmə
+│  ├─ W3_xatirlatma.json        Telegram xatırlatma
+│  ├─ WORKFLOWS.md              node-ların izahı
+│  └─ sql/                      workflow-lardakı SQL sorğuları
+├─ postman/                     API kolleksiyası
+├─ frontend/index.html          pasiyent səhifəsi
+└─ docs/screenshots/            ekran şəkilləri
+```
 
-| Vaxt | Nə göstərirsən |
+## Ekran şəkilləri
+
+| Şikayət və AI təklifi | Gün və saat seçimi | Təsdiq olunmuş talon |
+|---|---|---|
+| ![](docs/screenshots/01_sikayet.png) | ![](docs/screenshots/02_saatlar.png) | ![](docs/screenshots/03_tesdiq.png) |
+
+| Saat artıq tutulub | Telegram bildirişi |
 |---|---|
-| 0:00–0:45 | **Problem:** telefonla növbə, eyni saata iki pasiyent, unudulan növbələr |
-| 0:45–2:00 | **Demo 1 — AI:** "başım tez-tez ağrıyır" → AI nevroloqu təklif edir ✨ |
-| 2:00–3:00 | **Demo 2 — WOW:** iki brauzer pəncərəsində eyni saatı tut → ikincisi "artıq tutulub" alır |
-| 3:00–3:30 | **Demo 3:** ləğv et → saat yenidən boş görünür |
-| 3:30–4:15 | **Demo 4:** W3-ü işə sal → telefonunda Telegram xatırlatması |
-| 4:15–5:30 | **Kapotun altı:** n8n workflow-ları → DataGrip-də cədvəllər → `slot_generator.py` → `report.py` |
-| 5:30–6:00 | Öyrəndiklərin + növbəti addım (bonus) |
+| ![](docs/screenshots/04_tutulub.png) | ![](docs/screenshots/08_telegram.png) |
 
-> Təqdimatdan **bir gün əvvəl** slot_generator.py-ni yenidən işə sal ki, slotlar təzə olsun.
+## Gələcək planlar
 
----
-
-## Minimum tələblər (PDF-ə uyğun)
-
-- [x] 4 cədvəl SQLAlchemy ilə, seed.py həkimləri doldurur
-- [x] slot_generator.py 7 günlük boş saatları yaradır
-- [x] Eyni saata iki yazılış mümkün deyil (atomik UPDATE + unikal indeks)
-- [x] AI şikayətə görə ixtisas təklif edir (Groq)
-- [x] Növbədən 2 saat əvvəl Telegram xatırlatması bir dəfə gedir
-- [x] 3 n8n workflow (2 Webhook, 1 Schedule) · 2 Python skripti (SQLAlchemy + psycopg2)
-- [x] Bütün endpoint-lər Postman kolleksiyasında
-
-## Bonus (vaxt qalsa)
-
-- **Gözləmə siyahısı:** `waitlist` cədvəli; ləğv olunan saat ilk gözləyənə Telegram ilə təklif olunur.
-- **Admin səhifəsi:** günün cədvəli + doluluq faizi (`GET /medslot/admin/today`).
-- **Gəlməyənlər:** `appointments.status`-a `no_show` əlavə et, report.py-də statistika.
-
-## Tez-tez rast gəlinən xətalar
-
-| Xəta | Həll |
-|---|---|
-| Brauzerdə CORS xətası | Webhook node → Options → Allowed Origins = `*`; frontend-i `http.server` ilə aç |
-| Webhook 404 | Workflow aktiv deyil → `webhook-test` istifadə et və n8n-də "Listen for test event" bas |
-| n8n Postgres-ə qoşulmur | Host `postgres` olmalıdır, `localhost` yox |
-| Groq 401 | Header dəyəri `Bearer gsk_...` olmalıdır (Bearer + boşluq) |
-| Groq 429 | Dəqiqəlik limit dolub → 1 dəq gözlə; Retry On Fail aktivdir |
-| Groq "model not found" | `console.groq.com/docs/models`-a bax, `llama-3.3-70b-versatile` yaz |
-| AI JSON yox, mətn qaytarır | `response_format: json_object` və prompt-da nümunə JSON olsun |
-| Saatlar 4 saat fərqli görünür | `python seed.py`-ni yenidən işə sal (bazanın timezone-u Asia/Baku olur) |
-| Telegram mesajı getmir | Əvvəlcə bota özün yaz; chat_id-ni yoxla |
-| Windows: `ZoneInfoNotFoundError` | `pip install tzdata` |
+- Gözləmə siyahısı: ləğv edilən saat ilk gözləyən pasiyentə Telegram ilə təklif olunur.
+- Klinika administratoru üçün günün cədvəli və doluluq paneli.
+- Gəlməyən pasiyentlərin (`no_show`) qeydiyyatı və statistikası.
+- Serverə yerləşdirmə (deploy).
