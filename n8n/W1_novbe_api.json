@@ -1,0 +1,667 @@
+{
+  "name": "W1 Növbə API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "medslot/doctors",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "f93b6931-9985-4b52-ae37-505499ceddbf",
+      "name": "GET doctors",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "67d6917e-5db8-4bc5-808a-79499bb5c32d"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(\n         json_agg(json_build_object(\n           'id', id,\n           'full_name', full_name,\n           'specialty', specialty,\n           'work_start', to_char(work_start, 'HH24:MI'),\n           'work_end',   to_char(work_end,   'HH24:MI')\n         ) ORDER BY specialty),\n         '[]'::json) AS doctors\n  FROM doctors;",
+        "options": {}
+      },
+      "id": "a10e5cd3-3edb-46db-955a-7f0b991d022a",
+      "name": "DB doctors",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "medslotdb",
+          "name": "MedSlot DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ doctors: $json.doctors }) }}",
+        "options": {}
+      },
+      "id": "21a6a811-58a3-47e9-a903-6dc160063252",
+      "name": "Cavab doctors",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "medslot/slots",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "176903cd-7bd7-4cdd-bdc9-786ec9973eb6",
+      "name": "GET slots",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        220
+      ],
+      "webhookId": "450305ae-7ebc-4b4e-9e9a-061c77195e12"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "08881cb1-031f-46a5-9669-db3a54baa9bc",
+              "leftValue": "={{ /^\\d+$/.test($json.query.doctor_id || '') && /^\\d{4}-\\d{2}-\\d{2}$/.test($json.query.date || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ecb2982f-8af5-4589-9ddd-983d59cae20e",
+      "name": "Yoxla slots",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(\n         json_agg(json_build_object(\n           'id',   s.id,\n           'date', to_char(s.start_at, 'YYYY-MM-DD'),\n           'time', to_char(s.start_at, 'HH24:MI')\n         ) ORDER BY s.start_at),\n         '[]'::json) AS slots\n  FROM slots s\n WHERE s.doctor_id     = $1::int\n   AND s.start_at::date = $2::date\n   AND s.status        = 'free'\n   AND s.start_at      > now();",
+        "options": {
+          "queryReplacement": "={{ [ $json.query.doctor_id, $json.query.date ] }}"
+        }
+      },
+      "id": "30a88603-f81b-4c5b-a865-c772fc3d15ef",
+      "name": "DB slots",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        160
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "medslotdb",
+          "name": "MedSlot DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ slots: $json.slots }) }}",
+        "options": {}
+      },
+      "id": "6fd67f3f-99aa-46eb-b0d5-933f3fe3f329",
+      "name": "Cavab slots",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'doctor_id və date (YYYY-MM-DD) lazımdır' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "65df9ac1-5982-4041-b552-36a6b120324a",
+      "name": "400 slots",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "medslot/book",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "d01708c3-9bda-4756-a1e3-39cbaba6cc27",
+      "name": "POST book",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        500
+      ],
+      "webhookId": "6841d132-3e98-4022-921b-9e11750a24b5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "fee789b4-9fe9-4429-859a-0ca45bd71f80",
+              "leftValue": "={{ Number.isInteger(Number($json.body.slot_id)) && ($json.body.full_name || '').trim().length >= 3 && /^\\+?[0-9 ]{9,15}$/.test($json.body.phone || '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e3e30686-067e-4c54-9f2b-968e73a94452",
+      "name": "Yoxla book",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH s AS (\n    UPDATE slots\n       SET status = 'booked'\n     WHERE id = $1::int\n       AND status = 'free'\n       AND start_at > now()\n RETURNING id, doctor_id, start_at\n), p AS (\n    INSERT INTO patients (full_name, phone)\n    SELECT $2, $3\n     WHERE EXISTS (SELECT 1 FROM s)\n    ON CONFLICT (phone) DO UPDATE SET full_name = EXCLUDED.full_name\n RETURNING id\n), a AS (\n    INSERT INTO appointments (slot_id, patient_id, complaint, status, reminded)\n    SELECT s.id, p.id, $4, 'booked', false\n      FROM s, p\n RETURNING id, slot_id\n)\nSELECT (\n    SELECT json_build_object(\n             'appointment_id', a.id,\n             'doctor',    d.full_name,\n             'specialty', d.specialty,\n             'start_at',  to_char(s.start_at, 'DD.MM.YYYY HH24:MI'))\n      FROM a\n      JOIN s ON s.id = a.slot_id\n      JOIN doctors d ON d.id = s.doctor_id\n) AS appointment;",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.slot_id, $json.body.full_name.trim(), $json.body.phone.replace(/\\s/g, ''), $json.body.complaint || '' ] }}"
+        }
+      },
+      "id": "55127a69-4a9c-4f1a-91c5-3db20b50172b",
+      "name": "DB book",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        440
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "medslotdb",
+          "name": "MedSlot DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "21b11d26-6990-4305-b5e7-962338b23233",
+              "leftValue": "={{ !!$json.appointment }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "26ea27bf-7951-4b11-9191-84e3bd99637e",
+      "name": "Tutuldu?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ appointment: $json.appointment }) }}",
+        "options": {}
+      },
+      "id": "328c6cc5-c7e6-4c76-b1fd-5f47a8b40f78",
+      "name": "Cavab book",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'Bu saat artıq tutulub. Başqa saat seçin.' }) }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "e8656761-d64d-4009-8a6a-e5ea2ba8e02c",
+      "name": "409 book",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'Ad (min. 3 hərf), telefon və slot_id düzgün olmalıdır' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "ee1804a5-644c-46ae-b02b-b87c1cfd94d9",
+      "name": "400 book",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "=8812832162",
+        "text": "=✅ Növbəniz qeydə alındı\n\n{{ $('DB book').item.json.appointment.doctor }} ({{ $('DB book').item.json.appointment.specialty }})\n🗓 {{ $('DB book').item.json.appointment.start_at }}\n\nNövbə nömrəsi: #{{ $('DB book').item.json.appointment.appointment_id }}\nQəbuldan 2 saat əvvəl xatırladacağıq.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "b3f8faa4-d34b-4b5e-ae71-c66368365c4e",
+      "name": "Təsdiq mesajı",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        380
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "medslotbot",
+          "name": "MedSlot Bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "medslot/cancel",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "182fbd83-9d24-40f6-81c9-fbf5469a40f1",
+      "name": "POST cancel",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        800
+      ],
+      "webhookId": "e6113b0a-dd6a-4f7c-88ab-e4496b52f2d2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH a AS (\n    UPDATE appointments\n       SET status = 'cancelled'\n     WHERE id = $1::int\n       AND status = 'booked'\n RETURNING slot_id\n), s AS (\n    UPDATE slots\n       SET status = 'free'\n     WHERE id IN (SELECT slot_id FROM a)\n RETURNING id, start_at\n)\nSELECT (\n    SELECT json_build_object(\n             'slot_id', s.id,\n             'start_at', to_char(s.start_at, 'DD.MM.YYYY HH24:MI'))\n      FROM s\n) AS freed;",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.appointment_id ] }}"
+        }
+      },
+      "id": "58d38482-b723-49cf-aec4-586dbce4c9a4",
+      "name": "DB cancel",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        800
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "medslotdb",
+          "name": "MedSlot DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "34bba59e-4ed8-442a-9e56-764903540f01",
+              "leftValue": "={{ !!$json.freed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "659d6d7f-49c6-4454-a130-f8df2bc1161e",
+      "name": "Tapıldı?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, freed: $json.freed }) }}",
+        "options": {}
+      },
+      "id": "c1d294b3-039c-4097-977a-3c081bd8f29c",
+      "name": "Cavab cancel",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'Aktiv növbə tapılmadı (artıq ləğv olunub?)' }) }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "1ea2060b-ea47-4cb1-9ea8-385827cf305a",
+      "name": "404 cancel",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "=8812832162",
+        "text": "=↩️ Növbə ləğv edildi\n\n#{{ $('POST cancel').item.json.body.appointment_id }} nömrəli növbəniz ({{ $('DB cancel').item.json.freed.start_at }}) ləğv olundu. Bu saat yenidən boşdur.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "581ffc5c-0824-4f20-ad85-5377e7a845db",
+      "name": "Ləğv mesajı",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        740
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "medslotbot",
+          "name": "MedSlot Bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "GET doctors": {
+      "main": [
+        [
+          {
+            "node": "DB doctors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB doctors": {
+      "main": [
+        [
+          {
+            "node": "Cavab doctors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET slots": {
+      "main": [
+        [
+          {
+            "node": "Yoxla slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yoxla slots": {
+      "main": [
+        [
+          {
+            "node": "DB slots",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "400 slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB slots": {
+      "main": [
+        [
+          {
+            "node": "Cavab slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST book": {
+      "main": [
+        [
+          {
+            "node": "Yoxla book",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yoxla book": {
+      "main": [
+        [
+          {
+            "node": "DB book",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "400 book",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB book": {
+      "main": [
+        [
+          {
+            "node": "Tutuldu?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tutuldu?": {
+      "main": [
+        [
+          {
+            "node": "Cavab book",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "409 book",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cavab book": {
+      "main": [
+        [
+          {
+            "node": "Təsdiq mesajı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST cancel": {
+      "main": [
+        [
+          {
+            "node": "DB cancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB cancel": {
+      "main": [
+        [
+          {
+            "node": "Tapıldı?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tapıldı?": {
+      "main": [
+        [
+          {
+            "node": "Cavab cancel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "404 cancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cavab cancel": {
+      "main": [
+        [
+          {
+            "node": "Ləğv mesajı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

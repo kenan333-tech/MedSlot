@@ -1,0 +1,389 @@
+{
+  "info": {
+    "name": "MedSlot API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "MedSlot n8n webhook-ları. Test rejimində base_url-i .../webhook-test edin."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5678/webhook"
+    }
+  ],
+  "item": [
+    {
+      "name": "W1 · Növbə API",
+      "item": [
+        {
+          "name": "GET doctors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/medslot/doctors",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "doctors"
+              ]
+            },
+            "description": "Bütün həkimlər"
+          },
+          "response": []
+        },
+        {
+          "name": "GET slots",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/medslot/slots?doctor_id=1&date=2026-11-23",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "slots"
+              ],
+              "query": [
+                {
+                  "key": "doctor_id",
+                  "value": "1"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-11-23"
+                }
+              ]
+            },
+            "description": "Tarixi növbəti iş gününə dəyiş"
+          },
+          "response": []
+        },
+        {
+          "name": "GET slots — 400 (parametr yoxdur)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/medslot/slots",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "slots"
+              ]
+            },
+            "description": "Gözlənilən: 400"
+          },
+          "response": []
+        },
+        {
+          "name": "POST book",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/medslot/book",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "book"
+              ]
+            },
+            "description": "slot_id-ni GET slots cavabından götür",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slot_id\": 1,\n  \"full_name\": \"Ayan Həsənova\",\n  \"phone\": \"+994501234567\",\n  \"complaint\": \"Başım tez-tez ağrıyır\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST book — 409 (eyni saat ikinci dəfə)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/medslot/book",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "book"
+              ]
+            },
+            "description": "Əvvəlki sorğudan dərhal sonra göndər. Gözlənilən: 409",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slot_id\": 1,\n  \"full_name\": \"Murad Rzayev\",\n  \"phone\": \"+994557654321\",\n  \"complaint\": \"test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST book — 400 (səhv body)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/medslot/book",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "book"
+              ]
+            },
+            "description": "Gözlənilən: 400",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slot_id\": \"abc\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST cancel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/medslot/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "cancel"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointment_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST cancel — 404 (təkrar ləğv)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/medslot/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "cancel"
+              ]
+            },
+            "description": "Gözlənilən: 404",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointment_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "W2 · AI yönləndirmə",
+      "item": [
+        {
+          "name": "POST triage — baş ağrısı",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/medslot/triage",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "triage"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"complaint\": \"Son bir həftədir başım tez-tez ağrıyır, gözlərim qaralır\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST triage — dəri",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/medslot/triage",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "triage"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"complaint\": \"Qollarımda qırmızı səpgilər var, çox qaşınır\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST triage — təcili hal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/medslot/triage",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "triage"
+              ]
+            },
+            "description": "Gözlənilən: urgent = true",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"complaint\": \"Sinəmdə sıxıcı ağrı var, nəfəs ala bilmirəm\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST triage — 400 (qısa)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/medslot/triage",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "medslot",
+                "triage"
+              ]
+            },
+            "description": "Gözlənilən: 400",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"complaint\": \"ağrı\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "name": "W3 Xatırlatma",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "873d2288-2f37-443c-969e-a201b8aec689",
+      "name": "Hər 15 dəqiqə",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT a.id,\n       p.full_name,\n       p.chat_id,\n       d.full_name AS doctor,\n       d.specialty,\n       to_char(s.start_at, 'HH24:MI')    AS time,\n       to_char(s.start_at, 'DD.MM.YYYY') AS date\n  FROM appointments a\n  JOIN slots    s ON s.id = a.slot_id\n  JOIN patients p ON p.id = a.patient_id\n  JOIN doctors  d ON d.id = s.doctor_id\n WHERE a.status   = 'booked'\n   AND a.reminded = false\n   AND s.start_at BETWEEN now() AND now() + interval '2 hours';",
+        "options": {}
+      },
+      "id": "3cdcfb11-faa6-4571-95bb-74ee1b17e52d",
+      "name": "Növbələri tap",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "medslotdb",
+          "name": "MedSlot DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "3ad8326a-12f4-49c0-a0f8-1d4a4b4e3088",
+              "leftValue": "={{ !!$json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cdd9e2a9-dba6-40b5-9eca-52a97a56cae2",
+      "name": "Növbə var?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id || 'SENIN_CHAT_ID' }}",
+        "text": "=🔔 MedSlot xatırlatma\n\nHörmətli {{ $json.full_name }}, bu gün saat {{ $json.time }}-da\n{{ $json.doctor }} ({{ $json.specialty }}) qəbulunuz var.\n\nNövbə nömrəsi: #{{ $json.id }}\nGələ bilməyəcəksinizsə, növbəni ləğv edin ki, saat başqasına qalsın.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "15cefdf2-b403-4890-9103-68af6d588ff7",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        -20
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "medslotbot",
+          "name": "MedSlot Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE appointments\n   SET reminded = true\n WHERE id = $1::int\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Növbələri tap').item.json.id ] }}"
+        }
+      },
+      "id": "f153591a-80e8-4283-a59f-913c55bc5fdd",
+      "name": "Qeyd et",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        960,
+        -20
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "medslotdb",
+          "name": "MedSlot DB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Hər 15 dəqiqə": {
+      "main": [
+        [
+          {
+            "node": "Növbələri tap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Növbələri tap": {
+      "main": [
+        [
+          {
+            "node": "Növbə var?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Növbə var?": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram": {
+      "main": [
+        [
+          {
+            "node": "Qeyd et",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

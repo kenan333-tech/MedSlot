@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="az">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MedSlot · Onlayn növbə</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Commissioner:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f5f8f7;
+    --card: #ffffff;
+    --ink: #14322e;
+    --ink-soft: #4f6964;
+    --scrub: #2f7d6d;
+    --scrub-dark: #22604f;
+    --mint: #dcefe9;
+    --line: #cfddd8;
+    --signal: #d93d33;
+    --signal-wash: #fdecea;
+    --amber: #b7791f;
+    --radius-s: 8px;
+    --radius-l: 18px;
+    --display: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Commissioner", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.55 var(--body);
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--scrub); outline-offset: 2px; }
+
+  /* ---------- Başlıq ---------- */
+  .top {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    max-width: 1120px; margin: 0 auto; padding: 20px 20px 0;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 40px; height: 40px; border-radius: 12px; background: var(--scrub);
+    display: grid; place-items: center;
+  }
+  .brand-name { font: 800 22px/1 var(--display); letter-spacing: -0.02em; }
+  .brand-sub { font-size: 13px; color: var(--ink-soft); }
+  .mode { font-size: 13px; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .mode input { accent-color: var(--scrub); width: 16px; height: 16px; }
+
+  /* ---------- Layout ---------- */
+  .layout {
+    max-width: 1120px; margin: 0 auto; padding: 28px 20px 64px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 40px; align-items: start;
+  }
+  .flow { display: grid; gap: 20px; }
+
+  .intro h1 {
+    font: 800 clamp(34px, 5vw, 52px)/1.02 var(--display);
+    letter-spacing: -0.035em; margin: 0 0 12px; max-width: 14ch;
+  }
+  .intro p { margin: 0; color: var(--ink-soft); max-width: 52ch; }
+
+  .block {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-l);
+    padding: 24px;
+  }
+  .block[hidden] { display: none; }
+  .block.reveal { animation: rise .35s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .block h2 { font: 700 21px/1.25 var(--display); letter-spacing: -0.01em; margin: 0 0 4px; }
+  .hint { font-size: 14px; color: var(--ink-soft); margin: 0 0 16px; }
+
+  textarea {
+    width: 100%; min-height: 120px; resize: vertical;
+    border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 16px;
+    background: var(--paper); font-size: 17px; line-height: 1.5;
+  }
+  textarea:focus, input[type=text]:focus, input[type=tel]:focus { outline: none; border-color: var(--scrub); background: #fff; }
+
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 18px; }
+  .chip {
+    border: 1px solid var(--line); background: #fff; border-radius: 999px;
+    padding: 6px 12px; font-size: 14px; cursor: pointer; color: var(--ink-soft);
+  }
+  .chip:hover { border-color: var(--scrub); color: var(--ink); }
+
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .btn {
+    border: 0; border-radius: 12px; padding: 13px 20px; font-weight: 600; cursor: pointer;
+    background: var(--scrub); color: #fff;
+  }
+  .btn:hover { background: var(--scrub-dark); }
+  .btn:disabled { opacity: .6; cursor: progress; }
+  .btn-ghost { background: transparent; color: var(--scrub); padding: 13px 8px; }
+  .btn-ghost:hover { background: transparent; text-decoration: underline; }
+  .btn-danger { background: #fff; color: var(--signal); border: 1.5px solid #f1b8b3; }
+  .btn-danger:hover { background: var(--signal-wash); }
+
+  /* ---------- AI nəticəsi ---------- */
+  .thinking { display: flex; align-items: center; gap: 12px; color: var(--ink-soft); }
+  .pulse { display: inline-flex; gap: 5px; }
+  .pulse i { width: 8px; height: 8px; border-radius: 50%; background: var(--scrub); animation: blink 1s infinite; }
+  .pulse i:nth-child(2) { animation-delay: .15s; } .pulse i:nth-child(3) { animation-delay: .3s; }
+  @keyframes blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+
+  .verdict { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; }
+  .verdict-icon {
+    width: 52px; height: 52px; border-radius: 14px; background: var(--mint);
+    display: grid; place-items: center;
+  }
+  .verdict-label { font-size: 14px; color: var(--ink-soft); }
+  .verdict-spec { font: 800 30px/1.1 var(--display); letter-spacing: -0.02em; margin: 2px 0 6px; }
+  .verdict-reason { margin: 0; max-width: 56ch; }
+  .note { font-size: 13px; color: var(--ink-soft); margin: 14px 0 0; }
+
+  .urgent {
+    background: var(--signal-wash); border: 1.5px solid #f1b8b3; color: #8e211a;
+    border-radius: var(--radius-l); padding: 18px 20px;
+    display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center;
+  }
+  .urgent[hidden] { display: none; }
+  .urgent strong { display: block; font: 700 18px/1.3 var(--display); }
+  .urgent a { color: #8e211a; font-weight: 700; }
+
+  /* ---------- Həkimlər ---------- */
+  .doctors { display: grid; gap: 10px; }
+  .doctor {
+    display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 14px;
+    text-align: left; width: 100%; padding: 12px 14px; cursor: pointer;
+    background: #fff; border: 1.5px solid var(--line); border-radius: 14px;
+  }
+  .doctor:hover { border-color: var(--scrub); }
+  .doctor[aria-pressed="true"] { border-color: var(--scrub); background: var(--mint); }
+  .avatar {
+    width: 48px; height: 48px; border-radius: 50%; background: var(--ink); color: #fff;
+    display: grid; place-items: center; font: 700 16px/1 var(--display);
+  }
+  .doctor[aria-pressed="true"] .avatar { background: var(--scrub); }
+  .doctor-name { font-weight: 600; }
+  .doctor-meta { font-size: 14px; color: var(--ink-soft); }
+  .doctor-hours { font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+
+  /* ---------- Günlər və saatlar ---------- */
+  .days { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .day {
+    flex: 0 0 auto; width: 74px; padding: 10px 0 12px; cursor: pointer; text-align: center;
+    background: #fff; border: 1.5px solid var(--line); border-radius: 14px;
+  }
+  .day:hover { border-color: var(--scrub); }
+  .day[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .day-name { font-size: 13px; opacity: .75; }
+  .day-num { font: 800 26px/1.1 var(--display); }
+  .day-month { font-size: 12px; opacity: .75; }
+
+  .slot-group + .slot-group { margin-top: 16px; }
+  .slot-group h3 { font: 600 14px/1 var(--body); color: var(--ink-soft); margin: 18px 0 10px; }
+  .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+  .slot {
+    padding: 11px 0; cursor: pointer; font-weight: 600; font-variant-numeric: tabular-nums;
+    background: #fff; border: 1.5px solid var(--line); border-radius: 10px;
+  }
+  .slot:hover { border-color: var(--scrub); color: var(--scrub); }
+  .slot[aria-pressed="true"] { background: var(--scrub); border-color: var(--scrub); color: #fff; }
+  .empty { color: var(--ink-soft); margin: 8px 0 0; }
+
+  /* ---------- Forma ---------- */
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  .field label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 12px 14px; font-size: 16px;
+    border: 1.5px solid var(--line); border-radius: 12px; background: var(--paper);
+  }
+
+  .prep { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+  .prep li { padding-left: 28px; position: relative; max-width: 60ch; }
+  .prep li::before {
+    content: ""; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid var(--scrub); background: var(--mint);
+  }
+
+  /* ---------- Xəta ---------- */
+  .alert {
+    border-radius: 12px; padding: 14px 16px; font-size: 15px;
+    background: var(--signal-wash); color: #8e211a; border: 1px solid #f1b8b3;
+  }
+  .alert[hidden] { display: none; }
+
+  /* ---------- TALON ---------- */
+  .ticket-wrap { position: sticky; top: 24px; }
+  .ticket {
+    position: relative; background: var(--card); border-radius: var(--radius-l);
+    border: 1px solid var(--line); overflow: hidden;
+  }
+  .ticket-head {
+    background: var(--ink); color: #fff; padding: 18px 22px 16px;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .ticket-head b { font: 800 19px/1 var(--display); letter-spacing: -0.01em; }
+  .ticket-head span { font-size: 13px; opacity: .7; }
+  .ticket-body { padding: 8px 22px 6px; }
+  .row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 12px 0; border-bottom: 1px dashed var(--line); font-size: 15px;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row dt { color: var(--ink-soft); }
+  .row dd { margin: 0; font-weight: 600; text-align: right; }
+  .row dd.blank { color: #a8bbb6; font-weight: 400; }
+  .row dd.filled { animation: ink .4s ease-out; }
+  @keyframes ink { from { color: var(--scrub); } to { color: var(--ink); } }
+
+  .perf {
+    position: relative; height: 22px;
+    background: radial-gradient(circle at 0 50%, var(--paper) 11px, transparent 12px) left / 22px 22px no-repeat,
+                radial-gradient(circle at 100% 50%, var(--paper) 11px, transparent 12px) right / 22px 22px no-repeat;
+  }
+  .perf::after {
+    content: ""; position: absolute; left: 18px; right: 18px; top: 50%;
+    border-top: 2px dashed var(--line);
+  }
+  .stub { padding: 10px 22px 22px; display: flex; align-items: flex-end; justify-content: space-between; }
+  .stub small { display: block; font-size: 13px; color: var(--ink-soft); }
+  .number {
+    font: 800 64px/0.95 var(--display); letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums; color: #c4d4cf;
+  }
+  .ticket.confirmed .number { color: var(--ink); }
+  .barcode { width: 92px; height: 46px; opacity: .25; }
+  .ticket.confirmed .barcode { opacity: .9; }
+
+  .stamp {
+    position: absolute; left: 24px; top: 168px; transform: rotate(-9deg) scale(1.6);
+    border: 3px solid currentColor; border-radius: 10px; padding: 6px 12px;
+    font: 800 22px/1 var(--display); letter-spacing: 0.04em; opacity: 0; pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+  .stamp.ok { color: var(--scrub); }
+  .stamp.void { color: var(--signal); }
+  .stamp.show { animation: stamp .45s cubic-bezier(.2,1.6,.4,1) forwards; }
+  @keyframes stamp { to { opacity: .8; transform: rotate(-9deg) scale(1); } }
+
+  .ticket-foot { margin-top: 14px; display: grid; gap: 10px; }
+  .ticket-foot[hidden] { display: none; }
+  .ticket-tip { font-size: 13px; color: var(--ink-soft); margin: 14px 4px 0; }
+
+  /* ---------- Mobil ---------- */
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 24px; }
+    .ticket-wrap { position: static; order: -1; }
+    .ticket-body { display: none; }
+    .ticket.confirmed .ticket-body, .ticket.cancelled .ticket-body { display: block; }
+    .stamp { top: 150px; }
+  }
+  @media (max-width: 560px) {
+    .fields { grid-template-columns: 1fr; }
+    .block { padding: 20px 16px; }
+    .doctor { grid-template-columns: 44px 1fr; }
+    .doctor-hours { grid-column: 2; }
+    .number { font-size: 52px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  }
+
+  /* ---------- Çap: yalnız talon ---------- */
+  @media print {
+    body { background: #fff; }
+    .top, .flow, .ticket-foot, .ticket-tip { display: none !important; }
+    .layout { display: block; padding: 0; }
+    .ticket-wrap { position: static; max-width: 360px; margin: 0 auto; }
+    .ticket-body { display: block !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" fill="#fff"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">MedSlot</div>
+      <div class="brand-sub">Klinikaya onlayn növbə</div>
+    </div>
+  </div>
+  <label class="mode" title="n8n workflow-u aktiv deyilsə işarələ">
+    <input id="testMode" type="checkbox" /> n8n test rejimi
+  </label>
+</header>
+
+<div class="layout">
+  <main class="flow">
+    <section class="intro">
+      <h1>Zəng etmədən həkimə yazılın</h1>
+      <p>Narahatlığınızı öz sözlərinizlə yazın. Hansı həkimə getməli olduğunuzu təklif edəcəyik, boş saatı siz seçəcəksiniz.</p>
+    </section>
+
+    <div id="alert" class="alert" role="alert" hidden></div>
+
+    <!-- Şikayət -->
+    <section class="block" id="bComplaint">
+      <h2>Nədən narahatsınız?</h2>
+      <p class="hint">Nə vaxtdan başladığını və nə vaxt gücləndiyini yazsanız, təklif daha dəqiq olar.</p>
+      <label for="complaint" class="sr-only" style="position:absolute;left:-9999px">Şikayət</label>
+      <textarea id="complaint" maxlength="500" placeholder="Məsələn: bir həftədir başım tez-tez ağrıyır, axşamlar güclənir"></textarea>
+      <div class="examples" aria-label="Nümunə şikayətlər">
+        <button class="chip" type="button">Başım tez-tez ağrıyır</button>
+        <button class="chip" type="button">Qollarımda qaşınan səpgi var</button>
+        <button class="chip" type="button">Yeməkdən sonra mədəm yanır</button>
+        <button class="chip" type="button">Qulağım ağrıyır, eşitməm zəifləyib</button>
+      </div>
+      <div class="actions">
+        <button class="btn" id="btnTriage" type="button">Həkim təklif et</button>
+        <button class="btn btn-ghost" id="btnAllDoctors" type="button">Həkimi özüm seçirəm</button>
+      </div>
+    </section>
+
+    <!-- AI düşünür -->
+    <section class="block" id="bThinking" hidden>
+      <div class="thinking"><span class="pulse"><i></i><i></i><i></i></span> Şikayətiniz oxunur, uyğun ixtisas seçilir…</div>
+    </section>
+
+    <!-- Təcili -->
+    <div class="urgent" id="bUrgent" hidden role="alert">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <div>
+        <strong>Bu, təcili hal ola bilər</strong>
+        Növbə gözləməyin, dərhal <a href="tel:103">103</a> nömrəsinə zəng edin.
+      </div>
+    </div>
+
+    <!-- AI nəticəsi -->
+    <section class="block" id="bVerdict" hidden>
+      <div class="verdict">
+        <div class="verdict-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M6 3v6a5 5 0 0 0 10 0V3M6 3H4M16 3h2M11 14v2a5 5 0 0 0 10 0v-1" stroke="#2f7d6d" stroke-width="2" stroke-linecap="round"/><circle cx="21" cy="13" r="2" stroke="#2f7d6d" stroke-width="2"/></svg>
+        </div>
+        <div>
+          <div class="verdict-label">Sizə uyğun ixtisas</div>
+          <div class="verdict-spec" id="aiSpecialty"></div>
+          <p class="verdict-reason" id="aiReason"></p>
+        </div>
+      </div>
+      <p class="note">Bu, diaqnoz deyil. Son qərarı həkim müayinədən sonra verir.</p>
+    </section>
+
+    <!-- Həkimlər -->
+    <section class="block" id="bDoctors" hidden>
+      <h2>Həkim seçin</h2>
+      <p class="hint" id="doctorsHint"></p>
+      <div class="doctors" id="doctorList"></div>
+    </section>
+
+    <!-- Tarix və saat -->
+    <section class="block" id="bTime" hidden>
+      <h2>Gün və saat</h2>
+      <p class="hint">Bazar günü klinika bağlıdır.</p>
+      <div class="days" id="dateList"></div>
+      <div id="slotArea"></div>
+    </section>
+
+    <!-- Məlumat -->
+    <section class="block" id="bForm" hidden>
+      <h2>Kimi yazaq?</h2>
+      <p class="hint">Telefon nömrəsi yalnız növbə ilə bağlı xatırlatma üçündür.</p>
+      <div class="fields">
+        <div class="field">
+          <label for="fullName">Ad, soyad</label>
+          <input id="fullName" type="text" autocomplete="name" placeholder="Ayan Həsənova" />
+        </div>
+        <div class="field">
+          <label for="phone">Telefon</label>
+          <input id="phone" type="tel" autocomplete="tel" placeholder="+994 50 123 45 67" />
+        </div>
+      </div>
+      <button class="btn" id="btnBook" type="button">Növbəni təsdiqlə</button>
+    </section>
+    <!-- Təsdiqdən sonra -->
+    <section class="block" id="bDone" hidden>
+      <h2>Qəbula gəlməzdən əvvəl</h2>
+      <ul class="prep">
+        <li>Qəbuldan 10 dəqiqə tez gəlin, qeydiyyatda talon nömrənizi deyin.</li>
+        <li>Şəxsiyyət vəsiqənizi götürün.</li>
+        <li>Əvvəlki analiz nəticələriniz və içdiyiniz dərmanların siyahısı varsa, özünüzlə gətirin.</li>
+        <li>Gələ bilməyəcəksinizsə, talonun altından növbəni ləğv edin.</li>
+      </ul>
+    </section>
+  </main>
+
+  <!-- TALON -->
+  <aside class="ticket-wrap" aria-live="polite">
+    <div class="ticket" id="ticket">
+      <div class="ticket-head"><b>Növbə talonu</b><span id="ticketClinic">MedSlot klinikası</span></div>
+      <dl class="ticket-body">
+        <div class="row"><dt>İxtisas</dt><dd id="tSpec" class="blank">seçilməyib</dd></div>
+        <div class="row"><dt>Həkim</dt><dd id="tDoctor" class="blank">seçilməyib</dd></div>
+        <div class="row"><dt>Tarix</dt><dd id="tDate" class="blank">seçilməyib</dd></div>
+        <div class="row"><dt>Saat</dt><dd id="tTime" class="blank">seçilməyib</dd></div>
+        <div class="row"><dt>Pasiyent</dt><dd id="tName" class="blank">seçilməyib</dd></div>
+      </dl>
+      <div class="perf" aria-hidden="true"></div>
+      <div class="stub">
+        <div>
+          <small id="numberLabel">Növbə nömrəsi</small>
+          <div class="number" id="tNumber">№ —</div>
+        </div>
+        <svg class="barcode" viewBox="0 0 92 46" aria-hidden="true" id="barcode"></svg>
+      </div>
+      <div class="stamp" id="stamp"></div>
+    </div>
+
+    <div class="ticket-foot" id="ticketFoot" hidden>
+      <button class="btn" id="btnPrint" type="button">Talonu çap et</button>
+      <button class="btn btn-danger" id="btnCancel" type="button">Növbəni ləğv et</button>
+      <button class="btn btn-ghost" id="btnRestart" type="button">Başqa növbə götür</button>
+    </div>
+    <p class="ticket-tip" id="ticketTip">Seçim etdikcə talon dolacaq. Qəbuldan 2 saat əvvəl Telegram ilə xatırladacağıq.</p>
+  </aside>
+</div>
+
+<script>
+// ================= Konfiqurasiya =================
+const N8N = "http://localhost:5678";
+const PREFIX = "medslot";
+
+const state = { doctors: [], specialty: null, doctor: null, date: null, slot: null, appointment: null };
+
+const $ = (id) => document.getElementById(id);
+const MONTHS = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avq", "sen", "okt", "noy", "dek"];
+const WEEKDAYS = ["Bazar", "B.e.", "Ç.a.", "Çər.", "C.a.", "Cümə", "Şənbə"];
+
+// ================= API =================
+function baseUrl() {
+  return `${N8N}/${$("testMode").checked ? "webhook-test" : "webhook"}/${PREFIX}`;
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(baseUrl() + path, { headers: { "Content-Type": "application/json" }, ...options });
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* boş cavab */ }
+  if (!res.ok) {
+    const err = new Error(data.error || `Server xətası (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+function errorText(e) {
+  if (e instanceof TypeError) return "Sistemə qoşulmaq olmadı. Docker işləyir? n8n workflow-ları aktivdir?";
+  return e.message;
+}
+
+// ================= Köməkçilər =================
+function showAlert(text) { $("alert").textContent = text; $("alert").hidden = false; }
+function hideAlert() { $("alert").hidden = true; }
+
+function reveal(id) {
+  const el = $(id);
+  if (!el.hidden) return;
+  el.hidden = false;
+  el.classList.remove("reveal"); void el.offsetWidth; el.classList.add("reveal");
+}
+function hide(...ids) { ids.forEach((id) => { $(id).hidden = true; }); }
+function scrollToBlock(id) {
+  const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  $(id).scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+}
+
+function busy(btn, on, text) {
+  if (on) { btn.dataset.text = btn.textContent; btn.textContent = text; btn.disabled = true; }
+  else { btn.textContent = btn.dataset.text || btn.textContent; btn.disabled = false; }
+}
+
+function initials(name) {
+  return name.replace(/^Dr\.?\s*/i, "").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+}
+
+function isoOf(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function prettyDate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return `${d} ${MONTHS[m - 1]}, ${WEEKDAYS[dt.getDay()].toLowerCase()}`;
+}
+
+// ================= Talon =================
+function setField(id, value) {
+  const el = $(id);
+  const text = value || "seçilməyib";
+  if (el.textContent === text) return;
+  el.textContent = text;
+  el.classList.toggle("blank", !value);
+  el.classList.remove("filled");
+  if (value) { void el.offsetWidth; el.classList.add("filled"); }
+}
+
+function drawBarcode(seed) {
+  const svg = $("barcode");
+  svg.innerHTML = "";
+  let x = 0, n = seed || 7;
+  while (x < 92) {
+    n = (n * 9301 + 49297) % 233280;
+    const w = 1 + (n % 3);
+    const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    r.setAttribute("x", x); r.setAttribute("y", 0); r.setAttribute("width", w); r.setAttribute("height", 46);
+    r.setAttribute("fill", "#14322e");
+    svg.appendChild(r);
+    x += w + 1 + (n % 2) * 2;
+  }
+}
+
+function updateTicket() {
+  setField("tSpec", state.doctor ? state.doctor.specialty : state.specialty);
+  setField("tDoctor", state.doctor && state.doctor.full_name);
+  setField("tDate", state.date && prettyDate(state.date));
+  setField("tTime", state.slot && state.slot.time);
+  setField("tName", $("fullName").value.trim());
+}
+
+function stamp(text, kind) {
+  const s = $("stamp");
+  s.textContent = text;
+  s.className = "stamp " + kind;
+  void s.offsetWidth;
+  s.classList.add("show");
+}
+
+// ================= Render =================
+function renderDoctors(hint) {
+  $("doctorsHint").textContent = hint;
+  const list = $("doctorList");
+  list.innerHTML = "";
+  if (!state.doctors.length) {
+    list.innerHTML = `<p class="empty">Bu ixtisas üzrə həkim tapılmadı. "Həkimi özüm seçirəm" ilə bütün həkimlərə baxın.</p>`;
+    return;
+  }
+  state.doctors.forEach((d) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "doctor";
+    b.setAttribute("aria-pressed", String(state.doctor?.id === d.id));
+    b.innerHTML = `<span class="avatar"></span><span><span class="doctor-name"></span><br><span class="doctor-meta"></span></span><span class="doctor-hours"></span>`;
+    b.querySelector(".avatar").textContent = initials(d.full_name);
+    b.querySelector(".doctor-name").textContent = d.full_name;
+    b.querySelector(".doctor-meta").textContent = d.specialty;
+    b.querySelector(".doctor-hours").textContent = `${d.work_start}–${d.work_end}`;
+    b.onclick = () => selectDoctor(d);
+    list.appendChild(b);
+  });
+}
+
+function selectDoctor(d) {
+  state.doctor = d; state.slot = null;
+  hideAlert(); hide("bForm");
+  renderDoctors($("doctorsHint").textContent);
+  renderDays();
+  reveal("bTime");
+  updateTicket();
+  scrollToBlock("bTime");
+}
+
+function renderDays() {
+  const list = $("dateList");
+  list.innerHTML = "";
+  const d = new Date();
+  let count = 0;
+  while (count < 7) {
+    if (d.getDay() !== 0) {
+      const iso = isoOf(d);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "day";
+      b.setAttribute("aria-pressed", String(state.date === iso));
+      const name = count === 0 && iso === isoOf(new Date()) ? "Bu gün" : WEEKDAYS[d.getDay()];
+      b.innerHTML = `<div class="day-name"></div><div class="day-num"></div><div class="day-month"></div>`;
+      b.children[0].textContent = name;
+      b.children[1].textContent = d.getDate();
+      b.children[2].textContent = MONTHS[d.getMonth()];
+      b.onclick = () => { state.date = iso; state.slot = null; hide("bForm"); renderDays(); loadSlots(); updateTicket(); };
+      list.appendChild(b);
+      count++;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  if (state.date) loadSlots(); else $("slotArea").innerHTML = "";
+}
+
+async function loadSlots() {
+  const area = $("slotArea");
+  area.innerHTML = `<p class="empty">Boş saatlar yüklənir…</p>`;
+  try {
+    const { slots } = await api(`/slots?doctor_id=${state.doctor.id}&date=${state.date}`);
+    area.innerHTML = "";
+    if (!slots.length) {
+      area.innerHTML = `<p class="empty">Bu gün boş saat qalmayıb. Başqa günü seçin.</p>`;
+      return;
+    }
+    const groups = [
+      ["Səhər", slots.filter((s) => s.time < "12:00")],
+      ["Günorta", slots.filter((s) => s.time >= "12:00")],
+    ];
+    groups.forEach(([title, items]) => {
+      if (!items.length) return;
+      const g = document.createElement("div");
+      g.className = "slot-group";
+      g.innerHTML = `<h3></h3><div class="slots"></div>`;
+      g.querySelector("h3").textContent = `${title}, ${items.length} boş saat`;
+      items.forEach((s) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "slot";
+        b.textContent = s.time;
+        b.setAttribute("aria-pressed", String(state.slot?.id === s.id));
+        b.onclick = () => {
+          state.slot = s;
+          area.querySelectorAll(".slot").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+          updateTicket();
+          reveal("bForm");
+          scrollToBlock("bForm");
+          $("fullName").focus({ preventScroll: true });
+        };
+        g.querySelector(".slots").appendChild(b);
+      });
+      area.appendChild(g);
+    });
+  } catch (e) {
+    area.innerHTML = "";
+    showAlert(errorText(e));
+  }
+}
+
+// ================= Hadisələr =================
+document.querySelectorAll(".chip").forEach((c) => {
+  c.onclick = () => { $("complaint").value = c.textContent; $("complaint").focus(); };
+});
+
+$("btnTriage").onclick = async (ev) => {
+  hideAlert();
+  const complaint = $("complaint").value.trim();
+  if (complaint.length < 5) { showAlert("Şikayətinizi bir az ətraflı yazın: ən azı bir cümlə."); return; }
+
+  busy(ev.target, true, "Təklif hazırlanır…");
+  hide("bVerdict", "bUrgent", "bDoctors", "bTime", "bForm");
+  reveal("bThinking");
+  try {
+    const data = await api("/triage", { method: "POST", body: JSON.stringify({ complaint }) });
+    state.specialty = data.specialty;
+    state.doctors = data.doctors || [];
+    state.doctor = null; state.date = null; state.slot = null;
+
+    $("aiSpecialty").textContent = data.specialty;
+    $("aiReason").textContent = data.reason;
+    $("bUrgent").hidden = !data.urgent;
+    hide("bThinking");
+    reveal("bVerdict");
+    renderDoctors(`${data.specialty} üzrə ${state.doctors.length} həkim qəbul edir.`);
+    reveal("bDoctors");
+    updateTicket();
+    if (state.doctors.length === 1) selectDoctor(state.doctors[0]);
+    else scrollToBlock(data.urgent ? "bUrgent" : "bVerdict");
+  } catch (e) {
+    hide("bThinking");
+    showAlert(errorText(e));
+  } finally {
+    busy(ev.target, false);
+  }
+};
+
+$("btnAllDoctors").onclick = async () => {
+  hideAlert();
+  try {
+    const { doctors } = await api("/doctors");
+    state.doctors = doctors;
+    state.specialty = null; state.doctor = null; state.date = null; state.slot = null;
+    hide("bVerdict", "bUrgent", "bTime", "bForm");
+    renderDoctors("Klinikanın bütün həkimləri.");
+    reveal("bDoctors");
+    updateTicket();
+    scrollToBlock("bDoctors");
+  } catch (e) {
+    showAlert(errorText(e));
+  }
+};
+
+$("fullName").addEventListener("input", updateTicket);
+
+$("btnBook").onclick = async (ev) => {
+  hideAlert();
+  const full_name = $("fullName").value.trim();
+  const phone = $("phone").value.trim();
+  if (full_name.length < 3) { showAlert("Ad və soyadı yazın."); $("fullName").focus(); return; }
+  if (!/^\+?[0-9 ]{9,15}$/.test(phone)) { showAlert("Telefon nömrəsini +994501234567 formatında yazın."); $("phone").focus(); return; }
+
+  busy(ev.target, true, "Təsdiqlənir…");
+  try {
+    const { appointment } = await api("/book", {
+      method: "POST",
+      body: JSON.stringify({ slot_id: state.slot.id, full_name, phone, complaint: $("complaint").value.trim() }),
+    });
+    state.appointment = appointment;
+    confirmTicket();
+  } catch (e) {
+    if (e.status === 409) {
+      showAlert(`${state.slot.time} saatını bir az əvvəl başqa pasiyent tutdu. Başqa saat seçin.`);
+      state.slot = null; updateTicket(); hide("bForm");
+      loadSlots(); scrollToBlock("bTime");
+    } else {
+      showAlert(errorText(e));
+    }
+  } finally {
+    busy(ev.target, false);
+  }
+};
+
+function confirmTicket() {
+  const a = state.appointment;
+  const t = $("ticket");
+  t.classList.remove("cancelled");
+  t.classList.add("confirmed");
+  $("numberLabel").textContent = "Növbə nömrəsi";
+  $("tNumber").textContent = `№ ${a.appointment_id}`;
+  drawBarcode(a.appointment_id * 97);
+  stamp("TƏSDİQLƏNDİ", "ok");
+  $("ticketFoot").hidden = false;
+  $("btnCancel").hidden = false;
+  $("btnPrint").hidden = false;
+  $("ticketTip").textContent = `${a.start_at} qəbuluna 2 saat qalmış Telegram ilə xatırladacağıq.`;
+  ["bComplaint", "bVerdict", "bUrgent", "bDoctors", "bTime", "bForm"].forEach((id) => { $(id).hidden = true; });
+  reveal("bDone");
+  document.querySelector(".intro h1").textContent = "Növbəniz götürüldü";
+  document.querySelector(".intro p").textContent = "Talonu çap edə və ya ekran şəklini saxlaya bilərsiniz. Gələ bilməyəcəksinizsə, növbəni ləğv edin ki, saat başqasına qalsın.";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+$("btnCancel").onclick = async (ev) => {
+  if (!confirm("Növbəni ləğv etmək istəyirsiniz?")) return;
+  hideAlert();
+  busy(ev.target, true, "Ləğv edilir…");
+  try {
+    await api("/cancel", { method: "POST", body: JSON.stringify({ appointment_id: state.appointment.appointment_id }) });
+    const t = $("ticket");
+    t.classList.remove("confirmed");
+    t.classList.add("cancelled");
+    stamp("LƏĞV EDİLDİ", "void");
+    ev.target.hidden = true;
+    $("btnPrint").hidden = true;
+    $("bDone").hidden = true;
+    $("ticketTip").textContent = "Növbə ləğv edildi. Bu saat yenidən boşdur və başqa pasiyent yazıla bilər.";
+    document.querySelector(".intro h1").textContent = "Növbə ləğv edildi";
+    document.querySelector(".intro p").textContent = "Yeni növbə götürmək üçün talonun altındakı düyməni basın.";
+  } catch (e) {
+    showAlert(errorText(e));
+  } finally {
+    busy(ev.target, false);
+  }
+};
+
+$("btnPrint").onclick = () => window.print();
+
+$("btnRestart").onclick = () => {
+  Object.assign(state, { doctors: [], specialty: null, doctor: null, date: null, slot: null, appointment: null });
+  $("complaint").value = ""; $("fullName").value = ""; $("phone").value = "";
+  $("ticket").classList.remove("confirmed", "cancelled");
+  $("stamp").className = "stamp";
+  $("tNumber").textContent = "№ —";
+  $("ticketFoot").hidden = true;
+  $("ticketTip").textContent = "Seçim etdikcə talon dolacaq. Qəbuldan 2 saat əvvəl Telegram ilə xatırladacağıq.";
+  document.querySelector(".intro h1").textContent = "Zəng etmədən həkimə yazılın";
+  document.querySelector(".intro p").textContent = "Narahatlığınızı öz sözlərinizlə yazın. Hansı həkimə getməli olduğunuzu təklif edəcəyik, boş saatı siz seçəcəksiniz.";
+  hideAlert();
+  hide("bVerdict", "bUrgent", "bDoctors", "bTime", "bForm", "bThinking", "bDone");
+  $("bComplaint").hidden = false;
+  updateTicket();
+  drawBarcode(7);
+  window.scrollTo({ top: 0 });
+  $("complaint").focus();
+};
+
+drawBarcode(7);
+</script>
+</body>
+</html>

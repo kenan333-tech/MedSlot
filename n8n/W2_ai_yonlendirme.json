@@ -1,0 +1,261 @@
+{
+  "name": "W2 AI yönləndirmə",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "medslot/triage",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "066d4eef-2ec0-4890-9c3c-0746a13f18be",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "d85d8d3d-af94-402e-a3bd-b40ef85cac64"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "d11cce93-671b-4b1a-8137-3628cbdd7fd8",
+              "leftValue": "={{ ($json.body.complaint || '').trim().length >= 5 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d5a39b81-a34f-485c-8c7d-82b84d9a0a17",
+      "name": "Yoxla şikayət",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'Şikayətinizi bir az ətraflı yazın' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "167e955f-9f20-4efd-9e10-f6cb959fcfb4",
+      "name": "400 triage",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT string_agg(DISTINCT specialty, ', ' ORDER BY specialty) AS specialties\n  FROM doctors;",
+        "options": {}
+      },
+      "id": "6416426c-a347-4fb1-ac2e-546c720756ca",
+      "name": "İxtisaslar",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        -40
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "medslotdb",
+          "name": "MedSlot DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"openai/gpt-oss-120b\",\n  temperature: 0.2,\n  response_format: { type: \"json_object\" },\n  messages: [\n    { role: \"system\", content: \"Sən klinikada qeydiyyat köməkçisisən. Pasiyentin şikayətinə görə YALNIZ bu siyahıdan BİR ixtisas seç: \" + $json.specialties + \". Diaqnoz qoyma, dərman adı çəkmə. Əgər şikayətdə təcili hal əlaməti varsa (sinə ağrısı ilə təngnəfəslik, huşun itməsi, üz və ya qolda qəfil keyimə, güclü qanaxma), urgent = true yaz. Yalnız JSON qaytar, başqa heç nə yazma. Nümunə: {\\\"specialty\\\": \\\"Nevroloq\\\", \\\"reason\\\": \\\"Tez-tez təkrarlanan baş ağrısı nevroloji müayinə tələb edir.\\\", \\\"urgent\\\": false}. reason Azərbaycan dilində, 1 qısa cümlə olsun.\" },\n    { role: \"user\", content: $('Webhook').item.json.body.complaint }\n  ]\n}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "cbcc5a67-904c-4743-bb99-d83faafb2ed6",
+      "name": "Groq",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        -40
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groqapi",
+          "name": "Groq API"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI-nin cavabı JSON olmaya və ya siyahıda olmayan ixtisas seçə bilər.\n// Belə olanda Terapevt-ə yönləndiririk (ümumi həkim).\nconst allowed = $('İxtisaslar').first().json.specialties.split(', ');\n\nlet ai = {};\ntry {\n  ai = JSON.parse($input.first().json.choices[0].message.content);\n} catch (e) {\n  ai = {};\n}\n\nconst ok = allowed.includes(ai.specialty);\n\n// Qorunma: mətn səhv kodlaşdırma ilə gəlsə (Çin simvolları), izahı göstərmirik\nconst broken = /[㐀-鿿]/.test(ai.reason || '');\n\nreturn [{\n  json: {\n    specialty: ok ? ai.specialty : 'Terapevt',\n    reason: ok && ai.reason && !broken ? ai.reason : 'Əvvəlcə terapevt müayinəsi tövsiyə olunur.',\n    urgent: ai.urgent === true,\n    ai_ok: ok,\n  },\n}];"
+      },
+      "id": "7b2c4915-957a-4ff9-b6fb-b88ca2dc5d0b",
+      "name": "AI cavabını yoxla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(\n         json_agg(json_build_object(\n           'id', id,\n           'full_name', full_name,\n           'specialty', specialty,\n           'work_start', to_char(work_start, 'HH24:MI'),\n           'work_end',   to_char(work_end,   'HH24:MI')\n         )),\n         '[]'::json) AS doctors\n  FROM doctors\n WHERE specialty = $1;",
+        "options": {
+          "queryReplacement": "={{ [ $json.specialty ] }}"
+        }
+      },
+      "id": "ea9fad72-e366-4732-ae0e-9a533c0b7e1d",
+      "name": "DB həkimlər",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        -40
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "medslotdb",
+          "name": "MedSlot DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ specialty: $('AI cavabını yoxla').item.json.specialty, reason: $('AI cavabını yoxla').item.json.reason, urgent: $('AI cavabını yoxla').item.json.urgent, doctors: $json.doctors }) }}",
+        "options": {}
+      },
+      "id": "d3f7fd58-e332-4809-967d-ee94fc124996",
+      "name": "Cavab triage",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        -40
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Yoxla şikayət",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yoxla şikayət": {
+      "main": [
+        [
+          {
+            "node": "İxtisaslar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "400 triage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "İxtisaslar": {
+      "main": [
+        [
+          {
+            "node": "Groq",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq": {
+      "main": [
+        [
+          {
+            "node": "AI cavabını yoxla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI cavabını yoxla": {
+      "main": [
+        [
+          {
+            "node": "DB həkimlər",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB həkimlər": {
+      "main": [
+        [
+          {
+            "node": "Cavab triage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
